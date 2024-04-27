@@ -37,7 +37,7 @@ def express_organism(dir_path: Path):
         )
         return result.stdout.strip()
     except subprocess.CalledProcessError as e:
-        print(f"Error: {e}")
+        print(f"Error executing express_phenome.py: {e.stderr}")
         return ""
 
 
