@@ -10,7 +10,7 @@
     "Flaws: You don't like to admit it, but you are a cocaine addict. You realy really really want some cocaine.",
     "Skills: You are a skilled cook and baker. You are very good at all sports.",
     "Physical Description: You are a tall, athletic, and handsome man with a shiny utility belt.",
-    "Express yourself in the form of a dating profile."
+    "Express yourself in a dating profile in one paragraph."
   ],
   "parameters": {
     "mutation_rate": 0.01,
