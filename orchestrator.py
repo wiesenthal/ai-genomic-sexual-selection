@@ -31,10 +31,15 @@ def express_organism(dir_path: Path):
     if not filepath.exists():
         raise FileNotFoundError(f"No express_phenome.py found in {dir_path}")
     # run the python file and capture the stdout
-    result = subprocess.run(
-        ["python", str(filepath)], check=True, capture_output=True, text=True
-    )
-    return result.stdout.strip()
+    try:
+        result = subprocess.run(
+            ["python", str(filepath)], check=True, capture_output=True, text=True
+        )
+        return result.stdout.strip()
+    except subprocess.CalledProcessError as e:
+        print(f"Error: {e}")
+        return ""
+
 
 def run_generation(generation: str | int):
     next_generation = int(generation) + 1
