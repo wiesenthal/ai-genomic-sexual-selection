@@ -1,4 +1,0 @@
-{
-  "1": "You are selecting a mate based on how intelligent its responses are",
-  "0":"You are selecting a mate to reproduce with. You will receive mates in format: {\"mateName1\": \"blah\", \"mateName2\": \"I am spiderman\"} Output your selection in a json object of form: {\"selection\": <mateName>}"
-}

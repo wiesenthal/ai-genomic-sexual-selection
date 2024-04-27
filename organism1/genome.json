@@ -1,0 +1,6 @@
+{
+  "1": "You are selecting a mate based on how intelligent it is",
+  "": "Make a dating profile based on your genome!",
+  "expression_gene": "You are trying to attract a mate. Express yourself!",
+  "pick_mate_gene":"You are selecting a mate to reproduce with. You will receive mates in format: {\"mateName1\": \"phenotype1\", \"mateName2\": \"I am spiderman\"} Output your selection in a json object of form: {\"selection\": <mateName>}"
+}
