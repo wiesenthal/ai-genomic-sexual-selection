@@ -1,4 +1,8 @@
 from openai import OpenAI
+from dotenv import load_dotenv
+
+load_dotenv()
+
 client = OpenAI()
 
 def complete(system_prompt: str, user_prompt: str):
