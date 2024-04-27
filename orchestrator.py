@@ -2,6 +2,8 @@ import os
 from pathlib import Path
 import subprocess
 import json
+from concurrent.futures import ThreadPoolExecutor
+
 
 # read all subfolders of organisms/
 base_path = os.path.dirname(__file__)
@@ -25,7 +27,7 @@ def get_organism_dirs_of_generation(generation: str | int) -> list[Path]:
         if os.path.isdir(os.path.join(generation_path, f))
     ]
 
-
+# Get one organism's phenotype
 def express_organism(dir_path: Path):
     filepath = dir_path / "express_phenome.py"
     if not filepath.exists():
@@ -40,20 +42,26 @@ def express_organism(dir_path: Path):
         print(f"Error executing express_phenome.py: {e.stderr}")
         return ""
 
-
-def run_generation(generation: str | int):
-    next_generation = int(generation) + 1
+# Express all organisms in a generation
+def express_generation(generation: str | int):
     expressions = {}
-    # should async this
-    for organism_dir in get_organism_dirs_of_generation(generation):
-        # load genome file to get name
-        with open(organism_dir / "genome.json", "r") as f:
-            name = json.load(f)["name"]
-        expressions[name] = express_organism(organism_dir)
+    organism_dirs = get_organism_dirs_of_generation(generation)
+
+    with ThreadPoolExecutor() as executor:
+        futures = {
+            executor.submit(express_organism, organism_dir): organism_dir
+            for organism_dir in organism_dirs
+        }
+        for future in futures:
+            organism_dir = futures[future]
+
+            with open(organism_dir / "genome.json", "r") as f:
+                name = json.load(f)["name"]
+            expressions[name] = future.result()
     return expressions
 
 
-print(run_generation(latest_generation))
+if __name__ == "__main__":
+    for (k, v) in express_generation(latest_generation).items():
+        print(f"{k}: {v}\n")
 
-# organism_dirs = [f for f in os.listdir(generations_path) if os.path.isdir(os.path.join(generations_path, f))]
-# print(organism_dirs)
