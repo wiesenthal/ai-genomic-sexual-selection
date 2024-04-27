@@ -34,8 +34,7 @@ def express_organism(dir_path: Path):
     result = subprocess.run(
         ["python", str(filepath)], check=True, capture_output=True, text=True
     )
-    return result.stdout
-
+    return result.stdout.strip()
 
 def run_generation(generation: str | int):
     next_generation = int(generation) + 1
