@@ -9,8 +9,8 @@ def express_phenome():
         genome = json.load(f)
 
     prompt = "\n".join(genome["prompt_genes"])
-    prompt += f"\n{genome['expression_gene']}"
-    return complete(prompt)
+    user_prompt = f"\n{genome['expression_gene']}"
+    return complete(system_prompt=prompt, user_prompt=user_prompt)
 
 
 if __name__ == "__main__":
