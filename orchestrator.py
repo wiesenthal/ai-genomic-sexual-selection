@@ -29,6 +29,23 @@ def get_organism_dirs_of_generation(generation: str | int) -> list[Path]:
     ]
 
 
+def print_dict(obj: dict):
+    if isinstance(obj, str):
+        print(obj)
+        return
+    if isinstance(obj, list):
+        for item in obj:
+            print_dict(item)
+        return
+    if isinstance(obj, dict):
+        for key, value in obj.items():
+            print(f"{key}: ")
+            print("  ", end="")
+            print_dict(value)
+            print()
+            return
+
+
 # Get one organism's phenotype
 def express_organism(dir_path: Path):
     filepath = dir_path / "express_phenome.py"
@@ -82,7 +99,27 @@ def express_generation(generation: str | int):
     return expressions
 
 
-def make_kid(genome_1: dict, genome_2: dict) -> dict:
+def make_kid(path_1: Path, path_2: Path) -> dict:
+    with open(path_1 / "genome.json", "r") as f:
+        genome_1 = json.load(f)
+    with open(path_2 / "genome.json", "r") as f:
+        genome_2 = json.load(f)
+    with open(path_1 / "complete.py", "r") as f:
+        complete_1 = f.read()
+    with open(path_2 / "complete.py", "r") as f:
+        complete_2 = f.read()
+    with open(path_1 / "express_phenome.py", "r") as f:
+        express_phenome_1 = f.read()
+    with open(path_2 / "express_phenome.py", "r") as f:
+        express_phenome_2 = f.read()
+    with open(path_1 / "select_mate.py", "r") as f:
+        select_mate_1 = f.read()
+    with open(path_2 / "select_mate.py", "r") as f:
+        select_mate_2 = f.read()
+    with open(path_1 / "mutate.py", "r") as f:
+        mutate_1 = f.read()
+    with open(path_2 / "mutate.py", "r") as f:
+        mutate_2 = f.read()
     # load the mate1 and mate2
     # for each gene in prompt_genes
     prompt_genes_1 = genome_1["prompt_genes"]
@@ -116,12 +153,25 @@ def make_kid(genome_1: dict, genome_2: dict) -> dict:
     name2 = genome_2["name"]
     name = name1 if random.randint(0, 1) == 0 else name2
 
+    complete = complete_1 if random.randint(0, 1) == 0 else complete_2
+    express_phenome = (
+        express_phenome_1 if random.randint(0, 1) == 0 else express_phenome_2
+    )
+    select_mate = select_mate_1 if random.randint(0, 1) == 0 else select_mate_2
+    mutate = mutate_1 if random.randint(0, 1) == 0 else mutate_2
+
     return {
-        "name": name,
-        "prompt_genes": output_prompt_genes,
-        "parameters": parameters,
-        "expression_gene": expression_gene,
-        "pick_mate_gene": pick_mate_gene,
+        "genome": {
+            "name": name,
+            "prompt_genes": output_prompt_genes,
+            "parameters": parameters,
+            "expression_gene": expression_gene,
+            "pick_mate_gene": pick_mate_gene,
+        },
+        "complete": complete,
+        "express_phenome": express_phenome,
+        "select_mate": select_mate,
+        "mutate": mutate,
     }
 
 
@@ -170,15 +220,10 @@ def make_name_path_map(generation: str | int) -> dict[str, Path]:
     }
 
 
-def get_generation_matches(generation: str | int) -> list[tuple[str, str]]:
-    expressions = express_generation(generation)
-    for name, data in expressions.items():
-        print(f"{name}: {data['phenotype']}")
-        print()
+def match_generation_iteration(
+    expressions: dict[str, dict[str, str | Path]],
+) -> dict[str, dict[str, str | Path]]:
     selections = run_generation_selections(expressions)
-    for name, data in selections.items():
-        print(f"{name}: {data['selection']}")
-        print()
     matches = find_matches(selections)
     return {
         "expressions": expressions,
@@ -187,56 +232,81 @@ def get_generation_matches(generation: str | int) -> list[tuple[str, str]]:
     }
 
 
-if __name__ == "__main__":
-    data = get_generation_matches(latest_generation)
-    expressions = data["expressions"]
-    selections = data["selections"]
-    matches = data["matches"]
-    name_path_map = make_name_path_map(latest_generation)
-    # get the organism dirs of the matches
+def get_generation_matches(
+    expressions: dict[str, dict[str, str | Path]],
+    population_size: int,
+    max_attempts: int,
+) -> list[tuple[str, str]]:
+    matches = []
+    attempts = 0
+    while len(matches) < population_size and attempts < max_attempts:
+        print(f"Selection step {attempts + 1}")
+        data = match_generation_iteration(expressions)
+        matches.extend(data["matches"])
+        attempts += 1
+        # make selections dir
+        selections_dir = os.path.join(
+            generations_path, latest_generation, "outputs", "selections"
+        )
+        os.makedirs(selections_dir, exist_ok=True)
+        with open(
+            os.path.join(selections_dir, f"{attempts}.json"),
+            "w",
+        ) as f:
+            json.dump(data["selections"], f)
+    return matches
+
+
+def make_kids(matches, name_path_map):
+    kids = []
     for match in matches:
         name_1, name_2 = match
         organism_dir_1 = name_path_map[name_1]
         organism_dir_2 = name_path_map[name_2]
-        print(f"{name_1} and {name_2} are a match")
-        print(f"{name_1}: {organism_dir_1}")
-        print(f"{name_2}: {organism_dir_2}")
-        print()
-        genome_1 = json.load(open(organism_dir_1 / "genome.json"))
-        genome_2 = json.load(open(organism_dir_2 / "genome.json"))
-        kid = make_kid(genome_1, genome_2)
-        for key, value in kid.items():
-            if isinstance(value, list):
-                print(f"{key}:")
-                for gene in value:
-                    print(f"  {gene}")
-            else:
-                print(f"{key}: {value}")
-        print()
-    # organism_dirs = [name_path_map[name] for name in matches]
-    # # get genomes
-    # genome_paths = [directory / "genome.json" for directory in organism_dirs]
-    # genomes = [json.load(open(path)) for path in genome_paths]
-    # # make kids
-    # kids = [make_kid(genome_1, genome_2) for genome_1, genome_2 in zip(genomes, genomes[1:])]
-    # print(kids)
-    # output these to generations/0/output.json
-    # turn paths into strings
+        kid = make_kid(organism_dir_1, organism_dir_2)
+        kids.append(kid)
+    return kids
+
+
+def run_generation(generation: str | int):
+    expressions = express_generation(generation)
+    matches = get_generation_matches(expressions, 5, 10)
+    print(f"Matches: {len(matches)} - {matches}")
+    name_path_map = make_name_path_map(generation)
+    # get the organism dirs of the matches
+    kids = make_kids(matches, name_path_map)
+    matches_and_kids_dicts = [
+        {"match": match, "child_genome": kid["genome"]}
+        for match, kid in zip(matches, kids)
+    ]
+    outputs_dir = os.path.join(generations_path, generation, "outputs")
+    os.makedirs(outputs_dir, exist_ok=True)
+    with open(os.path.join(outputs_dir, "matches_and_kids.json"), "w") as f:
+        json.dump(matches_and_kids_dicts, f)
     for name, data in expressions.items():
         data["dir"] = str(data["dir"])
-    with open(
-        os.path.join(generations_path, latest_generation, "selections.json"), "w"
-    ) as f:
-        json.dump(selections, f)
-    with open(
-        os.path.join(generations_path, latest_generation, "expressions.json"), "w"
-    ) as f:
+    with open(os.path.join(outputs_dir, "expressions.json"), "w") as f:
         json.dump(expressions, f)
-    with open(
-        os.path.join(generations_path, latest_generation, "matches.json"), "w"
-    ) as f:
+    with open(os.path.join(outputs_dir, "matches.json"), "w") as f:
         json.dump(matches, f)
-    # for name, data in express_generation(latest_generation).items():
-    #     print(f"{name}: {data['phenotype']}")
-    #     print(f"{name}: {data['dir']}")
-    #     print()
+    return {
+        "kids": kids,
+        "matches": matches,
+        "expressions": expressions,
+    }
+
+
+if __name__ == "__main__":
+    print("~~~")
+    print(f"Running generation {latest_generation}")
+    print()
+    data = run_generation(latest_generation)
+    matches = data["matches"]
+    kids = data["kids"]
+    expressions = data["expressions"]
+    print()
+    for kid in kids:
+        print_dict(kid)
+        print()
+    # make the next generation
+    next_generation = int(latest_generation) + 1
