@@ -232,6 +232,10 @@ if __name__ == "__main__":
         os.path.join(generations_path, latest_generation, "expressions.json"), "w"
     ) as f:
         json.dump(expressions, f)
+    with open(
+        os.path.join(generations_path, latest_generation, "matches.json"), "w"
+    ) as f:
+        json.dump(matches, f)
     # for name, data in express_generation(latest_generation).items():
     #     print(f"{name}: {data['phenotype']}")
     #     print(f"{name}: {data['dir']}")
