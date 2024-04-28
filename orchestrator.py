@@ -4,6 +4,9 @@ import random
 import subprocess
 import json
 from concurrent.futures import ThreadPoolExecutor
+import random
+import string
+from mutate import mutate_or_keep_val
 
 
 # read all subfolders of organisms/
@@ -58,7 +61,10 @@ def express_organism(dir_path: Path):
         )
         return result.stdout.strip()
     except subprocess.CalledProcessError as e:
-        print(f"Error executing express_phenome.py: {e.stderr}")
+        with open(dir_path / "errors.log", "a") as error_file:
+            error_file.write(
+                f"\n{str(dir_path)}\nError executing express_phenome.py: {e.stderr}\n"
+            )
         return ""
 
 
@@ -76,7 +82,10 @@ def select_mate(organism_dir: Path, mates: dict[str, str]):
         )
         return result.stdout.strip()
     except subprocess.CalledProcessError as e:
-        print(f"Error executing select_mate.py: {e.stderr}")
+        with open(organism_dir / "errors.log", "a") as error_file:
+            error_file.write(
+                f"\n{str(organism_dir)}\nError executing select_mate.py: {e.stderr}\n"
+            )
         return None
 
 
@@ -99,6 +108,14 @@ def express_generation(generation: str | int):
     return expressions
 
 
+def make_random_value(length: int) -> str:
+    choices = (
+        string.digits + string.ascii_letters
+    )  # Combines digits, lowercase and uppercase letters
+    random_value = "".join(random.choice(choices) for _ in range(length))
+    return random_value
+
+
 def make_kid(path_1: Path, path_2: Path) -> dict:
     with open(path_1 / "genome.json", "r") as f:
         genome_1 = json.load(f)
@@ -116,10 +133,6 @@ def make_kid(path_1: Path, path_2: Path) -> dict:
         select_mate_1 = f.read()
     with open(path_2 / "select_mate.py", "r") as f:
         select_mate_2 = f.read()
-    with open(path_1 / "mutate.py", "r") as f:
-        mutate_1 = f.read()
-    with open(path_2 / "mutate.py", "r") as f:
-        mutate_2 = f.read()
     # load the mate1 and mate2
     # for each gene in prompt_genes
     prompt_genes_1 = genome_1["prompt_genes"]
@@ -127,38 +140,58 @@ def make_kid(path_1: Path, path_2: Path) -> dict:
 
     if len(prompt_genes_1) != len(prompt_genes_2):
         raise ValueError("Mates must have same number of prompt genes")
-    output_prompt_genes = []
-    for gene1, gene2 in zip(prompt_genes_1, prompt_genes_2):
-        # make selection
-        output_prompt_genes.append(gene1 if random.randint(0, 1) == 0 else gene2)
 
     parameters_1 = genome_1["parameters"]
     parameters_2 = genome_2["parameters"]
     parameters = {}
     for key in parameters_1.keys():
-        parameters[key] = (
-            parameters_1[key] if random.randint(0, 1) == 0 else parameters_2[key]
-        )
+        val = parameters_1[key] if random.randint(0, 1) == 0 else parameters_2[key]
+        parameters[key] = val
+    mutation_rate = parameters["mutation_rate"]
+    mutation_prompt = parameters["mutation_prompt"]
+    mutation_rate = mutate_or_keep_val(mutation_rate, mutation_prompt, mutation_rate)
+    mutation_prompt = mutate_or_keep_val(
+        mutation_prompt, mutation_prompt, mutation_rate
+    )
+
+    output_prompt_genes = []
+    for gene1, gene2 in zip(prompt_genes_1, prompt_genes_2):
+        # make selection
+        gene = gene1 if random.randint(0, 1) == 0 else gene2
+        gene = mutate_or_keep_val(gene, mutation_prompt, mutation_rate)
+        output_prompt_genes.append(gene)
 
     expression_gene_1 = genome_1["expression_gene"]
     expression_gene_2 = genome_2["expression_gene"]
     expression_gene = (
         expression_gene_1 if random.randint(0, 1) == 0 else expression_gene_2
     )
+
+    expression_gene = mutate_or_keep_val(
+        expression_gene, mutation_prompt, mutation_rate
+    )
+
     pick_mate_gene_1 = genome_1["pick_mate_gene"]
     pick_mate_gene_2 = genome_2["pick_mate_gene"]
     pick_mate_gene = pick_mate_gene_1 if random.randint(0, 1) == 0 else pick_mate_gene_2
 
+    pick_mate_gene = mutate_or_keep_val(pick_mate_gene, mutation_prompt, mutation_rate)
+
     name1 = genome_1["name"]
     name2 = genome_2["name"]
     name = name1 if random.randint(0, 1) == 0 else name2
+    name = mutate_or_keep_val(name, mutation_prompt, mutation_rate)
+    random_str = make_random_value(3)
+
+    name = f"{name1} {name2} {random_str}"
+    if len(name) > 50:
+        name = name[:46] + f" {random_str}"
 
     complete = complete_1 if random.randint(0, 1) == 0 else complete_2
     express_phenome = (
         express_phenome_1 if random.randint(0, 1) == 0 else express_phenome_2
     )
     select_mate = select_mate_1 if random.randint(0, 1) == 0 else select_mate_2
-    mutate = mutate_1 if random.randint(0, 1) == 0 else mutate_2
 
     return {
         "genome": {
@@ -171,7 +204,6 @@ def make_kid(path_1: Path, path_2: Path) -> dict:
         "complete": complete,
         "express_phenome": express_phenome,
         "select_mate": select_mate,
-        "mutate": mutate,
     }
 
 
@@ -304,9 +336,22 @@ if __name__ == "__main__":
     matches = data["matches"]
     kids = data["kids"]
     expressions = data["expressions"]
-    print()
-    for kid in kids:
-        print_dict(kid)
-        print()
     # make the next generation
     next_generation = int(latest_generation) + 1
+
+    # make a new dir in generations
+    next_organisms_dir = os.path.join(
+        generations_path, str(next_generation), "organisms"
+    )
+    os.makedirs(next_organisms_dir, exist_ok=True)
+    for kid in kids:
+        kid_dir = os.path.join(next_organisms_dir, kid["genome"]["name"])
+        os.makedirs(kid_dir, exist_ok=True)
+        with open(os.path.join(kid_dir, "genome.json"), "w") as f:
+            json.dump(kid["genome"], f)
+        with open(os.path.join(kid_dir, "complete.py"), "w") as f:
+            f.write(kid["complete"])
+        with open(os.path.join(kid_dir, "express_phenome.py"), "w") as f:
+            f.write(kid["express_phenome"])
+        with open(os.path.join(kid_dir, "select_mate.py"), "w") as f:
+            f.write(kid["select_mate"])
