@@ -156,6 +156,9 @@ def make_kid(path_1: Path, path_2: Path) -> dict:
     mutation_prompt = mutate_or_keep_val(
         mutation_prompt, mutation_prompt, mutation_rate
     )
+    parameters["mutation_prompt"] = mutation_prompt
+    parameters["mutation_rate"] = float(mutation_rate)
+    
 
     output_prompt_genes = []
     for gene1, gene2 in zip(prompt_genes_1, prompt_genes_2):
@@ -300,7 +303,7 @@ def make_kids(matches, name_path_map):
 
 def run_generation(generation: str | int):
     expressions = express_generation(generation)
-    matches = get_generation_matches(expressions, 10, 10)
+    matches = get_generation_matches(expressions, 12, 12)
     print(f"Matches: {len(matches)} - {matches}")
     name_path_map = make_name_path_map(generation)
     # get the organism dirs of the matches
@@ -326,33 +329,44 @@ def run_generation(generation: str | int):
     }
 
 
+from concurrent.futures import ThreadPoolExecutor
+import time
+
+# Global executor
+executor = ThreadPoolExecutor()
+
+
+def generate_images_with_backoff(expressions, generation, attempt=1):
+    try:
+        generate_images_from_generation(expressions, generation)
+    except Exception as e:
+        if attempt <= 5:  # Limit the number of retries
+            print(f"Attempt {attempt} failed: {e}")
+            time.sleep(61)  # Exponential backoff
+            generate_images_with_backoff(expressions, generation, attempt + 1)
+        else:
+            outputs_dir = os.path.join(generations_path, generation, "outputs")
+            with open(os.path.join(outputs_dir, "errors.log"), "a") as error_file:
+                error_file.write(
+                    f"Error generating images for generation {generation} after {attempt} attempts: {e}\n"
+                )
+
+
 def try_generate_images(
     generation: str | int, expressions: dict[str, dict[str, str | Path]]
 ):
-    import time
-    from concurrent.futures import ThreadPoolExecutor
+    # Submit the task to the global executor
+    executor.submit(generate_images_with_backoff, expressions, generation)
 
-    def generate_images_with_backoff(expressions, generation, attempt=1):
-        try:
-            generate_images_from_generation(expressions, generation)
-        except Exception as e:
-            if attempt <= 5:  # Limit the number of retries
-                print(f"Attempt {attempt} failed: {e}")
-                time.sleep(61)  # Exponential backoff
-                generate_images_with_backoff(expressions, generation, attempt + 1)
-            else:
-                outputs_dir = os.path.join(generations_path, generation, "outputs")
-                with open(os.path.join(outputs_dir, "errors.log"), "a") as error_file:
-                    error_file.write(
-                        f"Error generating images for generation {generation} after {attempt} attempts: {e}\n"
-                    )
 
-    with ThreadPoolExecutor() as executor:
-        executor.submit(generate_images_with_backoff, expressions, generation)
+# Ensure to shutdown the executor properly when the application is closing
+import atexit
+
+atexit.register(executor.shutdown)
 
 
 def loop():
-    generation = latest_generation
+    generation = "67"
     while True:
         print("~~~")
         print(f"Running generation {generation}")

@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 load_dotenv()
 
+# DO NOT COMMIT
 client = OpenAI()
 
 
@@ -20,11 +21,20 @@ def load_descriptions(file_path):
     return {name: person["phenotype"] for name, person in data.items()}
 
 
+import time
+
+
 def generate_image(description):
-    print(f"Generating image for description: {description}")
-    response = client.images.generate(
-        model="dall-e-3", prompt=description, size="1024x1024", quality="standard", n=1
-    )
+    try:
+        response = client.images.generate(
+            model="dall-e-2",
+            prompt=description,
+            size="512x512",
+            quality="standard",
+            n=1,
+        )
+    except Exception as e:
+        return ""
     return response.data[0].url
 
 

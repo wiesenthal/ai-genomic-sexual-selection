@@ -1,6 +1,7 @@
 from flask import Flask
 import os
 import json
+import re
 
 app = Flask(__name__)
 
@@ -9,7 +10,8 @@ def display_images():
     image_data_dir = os.path.join(os.getcwd(), 'image_data')
     image_files = [f for f in os.listdir(image_data_dir) if f.endswith('.json')]
     # Sort by filename
-    image_files.sort()
+    image_files.sort(key=lambda x: int(re.search(r'\d+', x).group()))
+    
     images_content = {}
     for image_file in image_files:
         with open(os.path.join(image_data_dir, image_file), 'r') as file:

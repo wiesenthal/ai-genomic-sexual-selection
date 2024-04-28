@@ -30,7 +30,7 @@ def mutate_or_keep_val(val: str | float, mutation_prompt: str, mutation_rate: fl
             result = complete(system_prompt=mutation_prompt, user_prompt=str(val))
             print(f"MUTATION RESULT: '{result}'")
             # if result is a number, return a float
-            if result.isdigit():
+            if result.replace('.', '', 1).isdigit():
                 return float(result)
             else:
                 print(f"MUTATION FAILED: '{result}' is not a number")
