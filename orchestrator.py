@@ -93,11 +93,7 @@ def make_kid(genome_1: dict, genome_2: dict) -> dict:
     output_prompt_genes = []
     for gene1, gene2 in zip(prompt_genes_1, prompt_genes_2):
         # make selection
-        index = random.randint(0, 1)
-        if index == 0:
-            output_prompt_genes.append(gene1)
-        else:
-            output_prompt_genes.append(gene2)
+        output_prompt_genes.append(gene1 if random.randint(0, 1) == 0 else gene2)
 
     parameters_1 = genome_1["parameters"]
     parameters_2 = genome_2["parameters"]
@@ -116,7 +112,12 @@ def make_kid(genome_1: dict, genome_2: dict) -> dict:
     pick_mate_gene_2 = genome_2["pick_mate_gene"]
     pick_mate_gene = pick_mate_gene_1 if random.randint(0, 1) == 0 else pick_mate_gene_2
 
+    name1 = genome_1["name"]
+    name2 = genome_2["name"]
+    name = name1 if random.randint(0, 1) == 0 else name2
+
     return {
+        "name": name,
         "prompt_genes": output_prompt_genes,
         "parameters": parameters,
         "expression_gene": expression_gene,
@@ -141,23 +142,36 @@ def run_generation_selections(expessions: dict[str, dict[str, str | Path]]):
         for name, future in futures.items():
             selections[name] = {
                 "selection": future.result(),
-                "dir": data["dir"],
             }
 
     return selections
 
 
-def find_matches(
-    selections: dict[str, dict[str, str | Path]]
-) -> dict[str, dict[str, str | Path]]:
+def find_matches(selections: dict[str, dict[str, str]]) -> list[tuple[str, str]]:
+    matches = []
     for name, data in selections.items():
-        if data["selection"] == "":
-            selections[name]["selection"] = data["phenotype"]
-    return selections
+        selection = data["selection"]
+        if selection == "":
+            continue
+        if selection in selections and selections[selection]["selection"] == name:
+            match = tuple(sorted([name, selection]))
+            if match not in matches:
+                matches.append(match)
+    return matches
 
 
-if __name__ == "__main__":
-    expressions = express_generation(latest_generation)
+def make_name_path_map(generation: str | int) -> dict[str, Path]:
+    organism_dirs = get_organism_dirs_of_generation(generation)
+    genome_paths = [organism_dir / "genome.json" for organism_dir in organism_dirs]
+    genomes = [json.load(open(genome_path)) for genome_path in genome_paths]
+    return {
+        genome["name"]: organism_dir
+        for organism_dir, genome in zip(organism_dirs, genomes)
+    }
+
+
+def get_generation_matches(generation: str | int) -> list[tuple[str, str]]:
+    expressions = express_generation(generation)
     for name, data in expressions.items():
         print(f"{name}: {data['phenotype']}")
         print()
@@ -165,10 +179,49 @@ if __name__ == "__main__":
     for name, data in selections.items():
         print(f"{name}: {data['selection']}")
         print()
-        # output these to generations/0/output.json
+    matches = find_matches(selections)
+    return {
+        "expressions": expressions,
+        "selections": selections,
+        "matches": matches,
+    }
+
+
+if __name__ == "__main__":
+    data = get_generation_matches(latest_generation)
+    expressions = data["expressions"]
+    selections = data["selections"]
+    matches = data["matches"]
+    name_path_map = make_name_path_map(latest_generation)
+    # get the organism dirs of the matches
+    for match in matches:
+        name_1, name_2 = match
+        organism_dir_1 = name_path_map[name_1]
+        organism_dir_2 = name_path_map[name_2]
+        print(f"{name_1} and {name_2} are a match")
+        print(f"{name_1}: {organism_dir_1}")
+        print(f"{name_2}: {organism_dir_2}")
+        print()
+        genome_1 = json.load(open(organism_dir_1 / "genome.json"))
+        genome_2 = json.load(open(organism_dir_2 / "genome.json"))
+        kid = make_kid(genome_1, genome_2)
+        for key, value in kid.items():
+            if isinstance(value, list):
+                print(f"{key}:")
+                for gene in value:
+                    print(f"  {gene}")
+            else:
+                print(f"{key}: {value}")
+        print()
+    # organism_dirs = [name_path_map[name] for name in matches]
+    # # get genomes
+    # genome_paths = [directory / "genome.json" for directory in organism_dirs]
+    # genomes = [json.load(open(path)) for path in genome_paths]
+    # # make kids
+    # kids = [make_kid(genome_1, genome_2) for genome_1, genome_2 in zip(genomes, genomes[1:])]
+    # print(kids)
+    # output these to generations/0/output.json
     # turn paths into strings
-    for name, data in selections.items():
-        data["dir"] = str(data["dir"])
     for name, data in expressions.items():
         data["dir"] = str(data["dir"])
     with open(
