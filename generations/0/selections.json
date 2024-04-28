@@ -1,0 +1,18 @@
+{
+  "Hunter": {
+    "selection": "Benji",
+    "dir": "/Users/miles/Documents/github/ai-genomic-sexual-selection/generations/0/organisms/organism1"
+  },
+  "Benji": {
+    "selection": "Hunter",
+    "dir": "/Users/miles/Documents/github/ai-genomic-sexual-selection/generations/0/organisms/organism1"
+  },
+  "Miles": {
+    "selection": "Benji",
+    "dir": "/Users/miles/Documents/github/ai-genomic-sexual-selection/generations/0/organisms/organism1"
+  },
+  "Bill": {
+    "selection": "Hunter",
+    "dir": "/Users/miles/Documents/github/ai-genomic-sexual-selection/generations/0/organisms/organism1"
+  }
+}
