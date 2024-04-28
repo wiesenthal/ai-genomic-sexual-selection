@@ -21,7 +21,7 @@ def complete(system_prompt: str, user_prompt: str, **kwargs):
 
 def mutate_or_keep_val(val: str | float, mutation_prompt: str, mutation_rate: float):
     if random.random() < mutation_rate:
-        print(f"MUTATION HAPPENING: '{val}' is mutating! mutation_prompt: '{mutation_prompt}', mutation_rate: {mutation_rate}")
+        print(f"MUTATION HAPPENING: '{val}' is mutating!")
         if isinstance(val, str):
             result = complete(system_prompt=mutation_prompt, user_prompt=val)
             print(f"MUTATION RESULT: '{result}'")

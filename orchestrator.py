@@ -7,7 +7,9 @@ from concurrent.futures import ThreadPoolExecutor
 import random
 import string
 from mutate import mutate_or_keep_val
+import names
 
+all_names_ever = set()
 
 # read all subfolders of organisms/
 base_path = os.path.dirname(__file__)
@@ -177,15 +179,10 @@ def make_kid(path_1: Path, path_2: Path) -> dict:
 
     pick_mate_gene = mutate_or_keep_val(pick_mate_gene, mutation_prompt, mutation_rate)
 
-    name1 = genome_1["name"]
-    name2 = genome_2["name"]
-    name = name1 if random.randint(0, 1) == 0 else name2
-    name = mutate_or_keep_val(name, mutation_prompt, mutation_rate)
-    random_str = make_random_value(3)
-
-    name = f"{name1} {name2} {random_str}"
-    if len(name) > 50:
-        name = name[:46] + f" {random_str}"
+    name = names.get_full_name()
+    while name in all_names_ever:
+        name = names.get_full_name()
+    all_names_ever.add(name)
 
     complete = complete_1 if random.randint(0, 1) == 0 else complete_2
     express_phenome = (
@@ -302,7 +299,7 @@ def make_kids(matches, name_path_map):
 
 def run_generation(generation: str | int):
     expressions = express_generation(generation)
-    matches = get_generation_matches(expressions, 5, 10)
+    matches = get_generation_matches(expressions, 15, 15)
     print(f"Matches: {len(matches)} - {matches}")
     name_path_map = make_name_path_map(generation)
     # get the organism dirs of the matches
@@ -329,34 +326,35 @@ def run_generation(generation: str | int):
 
 
 def loop():
-  generation = latest_generation
-  while True:
-    print("~~~")
-    print(f"Running generation {generation}")
-    print()
-    data = run_generation(generation)
-    matches = data["matches"]
-    kids = data["kids"]
-    expressions = data["expressions"]
-    # make the next generation
-    generation = str(int(generation) + 1)
+    generation = latest_generation
+    while True:
+        print("~~~")
+        print(f"Running generation {generation}")
+        print()
+        data = run_generation(generation)
+        matches = data["matches"]
+        kids = data["kids"]
+        if len(kids) == 0:
+            print("No kids found, stopping. EXTINCTION.")
+            break
+        expressions = data["expressions"]
+        # make the next generation
+        generation = str(int(generation) + 1)
 
-    # make a new dir in generations
-    next_organisms_dir = os.path.join(
-        generations_path, generation, "organisms"
-    )
-    os.makedirs(next_organisms_dir, exist_ok=True)
-    for kid in kids:
-        kid_dir = os.path.join(next_organisms_dir, kid["genome"]["name"])
-        os.makedirs(kid_dir, exist_ok=True)
-        with open(os.path.join(kid_dir, "genome.json"), "w") as f:
-            json.dump(kid["genome"], f)
-        with open(os.path.join(kid_dir, "complete.py"), "w") as f:
-            f.write(kid["complete"])
-        with open(os.path.join(kid_dir, "express_phenome.py"), "w") as f:
-            f.write(kid["express_phenome"])
-        with open(os.path.join(kid_dir, "select_mate.py"), "w") as f:
-            f.write(kid["select_mate"])
+        # make a new dir in generations
+        next_organisms_dir = os.path.join(generations_path, generation, "organisms")
+        os.makedirs(next_organisms_dir, exist_ok=True)
+        for kid in kids:
+            kid_dir = os.path.join(next_organisms_dir, kid["genome"]["name"])
+            os.makedirs(kid_dir, exist_ok=True)
+            with open(os.path.join(kid_dir, "genome.json"), "w") as f:
+                json.dump(kid["genome"], f)
+            with open(os.path.join(kid_dir, "complete.py"), "w") as f:
+                f.write(kid["complete"])
+            with open(os.path.join(kid_dir, "express_phenome.py"), "w") as f:
+                f.write(kid["express_phenome"])
+            with open(os.path.join(kid_dir, "select_mate.py"), "w") as f:
+                f.write(kid["select_mate"])
 
 
 if __name__ == "__main__":
