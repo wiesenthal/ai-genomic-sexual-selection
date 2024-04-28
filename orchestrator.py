@@ -8,6 +8,7 @@ import random
 import string
 from mutate import mutate_or_keep_val
 import names
+from image_generator import generate_images_from_generation
 
 all_names_ever = set()
 
@@ -299,7 +300,7 @@ def make_kids(matches, name_path_map):
 
 def run_generation(generation: str | int):
     expressions = express_generation(generation)
-    matches = get_generation_matches(expressions, 15, 15)
+    matches = get_generation_matches(expressions, 10, 10)
     print(f"Matches: {len(matches)} - {matches}")
     name_path_map = make_name_path_map(generation)
     # get the organism dirs of the matches
@@ -325,6 +326,31 @@ def run_generation(generation: str | int):
     }
 
 
+def try_generate_images(
+    generation: str | int, expressions: dict[str, dict[str, str | Path]]
+):
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+
+    def generate_images_with_backoff(expressions, generation, attempt=1):
+        try:
+            generate_images_from_generation(expressions, generation)
+        except Exception as e:
+            if attempt <= 5:  # Limit the number of retries
+                print(f"Attempt {attempt} failed: {e}")
+                time.sleep(61)  # Exponential backoff
+                generate_images_with_backoff(expressions, generation, attempt + 1)
+            else:
+                outputs_dir = os.path.join(generations_path, generation, "outputs")
+                with open(os.path.join(outputs_dir, "errors.log"), "a") as error_file:
+                    error_file.write(
+                        f"Error generating images for generation {generation} after {attempt} attempts: {e}\n"
+                    )
+
+    with ThreadPoolExecutor() as executor:
+        executor.submit(generate_images_with_backoff, expressions, generation)
+
+
 def loop():
     generation = latest_generation
     while True:
@@ -338,6 +364,8 @@ def loop():
             print("No kids found, stopping. EXTINCTION.")
             break
         expressions = data["expressions"]
+        # generate images
+        try_generate_images(generation, expressions)
         # make the next generation
         generation = str(int(generation) + 1)
 
