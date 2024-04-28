@@ -328,20 +328,22 @@ def run_generation(generation: str | int):
     }
 
 
-if __name__ == "__main__":
+def loop():
+  generation = latest_generation
+  while True:
     print("~~~")
-    print(f"Running generation {latest_generation}")
+    print(f"Running generation {generation}")
     print()
-    data = run_generation(latest_generation)
+    data = run_generation(generation)
     matches = data["matches"]
     kids = data["kids"]
     expressions = data["expressions"]
     # make the next generation
-    next_generation = int(latest_generation) + 1
+    generation = str(int(generation) + 1)
 
     # make a new dir in generations
     next_organisms_dir = os.path.join(
-        generations_path, str(next_generation), "organisms"
+        generations_path, generation, "organisms"
     )
     os.makedirs(next_organisms_dir, exist_ok=True)
     for kid in kids:
@@ -355,3 +357,7 @@ if __name__ == "__main__":
             f.write(kid["express_phenome"])
         with open(os.path.join(kid_dir, "select_mate.py"), "w") as f:
             f.write(kid["select_mate"])
+
+
+if __name__ == "__main__":
+    loop()
